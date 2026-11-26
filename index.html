@@ -1,0 +1,861 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>로트워치 LotWatch</title>
+<meta name="description" content="배치(lot)별 품질검사 결과 추세 대시보드 시제품 - 추세 차트와 이상 배치 자동 경고">
+<style>
+:root{
+  --bg:#f4f6f9; --surface:#ffffff; --surface-2:#eef1f5; --text:#1b2330; --muted:#5b6676; --border:#d8dee6;
+  --primary:#2457c5; --primary-ink:#ffffff;
+  --ok:#1d7f46; --ok-bg:#e6f4eb; --warn:#b45f00; --warn-bg:#fff1dc; --bad:#c62828; --bad-bg:#fdeaea;
+  --point:#2457c5; --spec:#c62828; --mean:#5b6676; --ctl:#9aa5b4; --grid:#e5e9ef;
+  --sample-bg:#fff6d6; --sample-ink:#6b5200;
+  --radius:12px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f141b; --surface:#171e28; --surface-2:#1f2834; --text:#e6ebf2; --muted:#9ca8b8; --border:#2e3947;
+    --primary:#6f9dff; --primary-ink:#0b1220;
+    --ok:#52c784; --ok-bg:#15301f; --warn:#ffab4a; --warn-bg:#3a2a12; --bad:#ff6f6f; --bad-bg:#3d1c1c;
+    --point:#6f9dff; --spec:#ff6f6f; --mean:#9ca8b8; --ctl:#5f6b7b; --grid:#263140;
+    --sample-bg:#3a3214; --sample-ink:#f3dc8a;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
+  font-size:15px;line-height:1.5;word-break:keep-all}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+header.top{background:var(--surface);border-bottom:1px solid var(--border)}
+header.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:14px;padding-bottom:14px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:34px;height:34px;border-radius:9px;background:var(--primary);display:grid;place-items:center;flex:none}
+.brand h1{font-size:19px;margin:0;line-height:1.2}
+.brand p{margin:0;font-size:12.5px;color:var(--muted)}
+nav.tabs{display:flex;gap:4px;background:var(--surface-2);padding:4px;border-radius:10px}
+nav.tabs button{border:0;background:transparent;color:var(--muted);font:inherit;font-size:14px;font-weight:600;padding:7px 12px;border-radius:7px;cursor:pointer}
+nav.tabs button[aria-selected="true"]{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+main{padding:16px 0 40px}
+.banner{background:var(--sample-bg);color:var(--sample-ink);border-radius:10px;padding:9px 12px;font-size:13.5px;margin-bottom:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+.card h2{font-size:16px;margin:0 0 10px}
+.card .hint{color:var(--muted);font-size:13px;margin:0 0 10px}
+.filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:600}
+select,input[type=text],input[type=date],input[type=number]{font:inherit;font-size:15px;color:var(--text);background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+select:focus,input:focus,button:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px}
+.kpi .k{font-size:12.5px;color:var(--muted);font-weight:600}
+.kpi .v{font-size:26px;font-weight:700;line-height:1.25;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12px;color:var(--muted)}
+.kpi.bad .v{color:var(--bad)} .kpi.warn .v{color:var(--warn)} .kpi.ok .v{color:var(--ok)}
+.chart-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.chart-head h2{margin:0}
+.chart-head .meta{font-size:12.5px;color:var(--muted)}
+#chart{position:relative;width:100%;min-height:220px}
+#chart svg{display:block;width:100%;height:auto;overflow:visible;touch-action:manipulation}
+#chart text{fill:var(--muted);font-size:11px;font-family:inherit}
+.tip{position:absolute;pointer-events:none;background:var(--text);color:var(--bg);font-size:12.5px;line-height:1.45;padding:7px 9px;border-radius:8px;
+  min-width:140px;max-width:230px;box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:5;display:none}
+.tip b{font-weight:700}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin-top:8px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:11px;height:11px;border-radius:50%;display:inline-block}
+.ln{width:18px;height:0;border-top:2px dashed var(--spec);display:inline-block}
+.ln.mean{border-top:1.5px solid var(--mean)} .ln.ctl{border-top:1.5px dotted var(--ctl)}
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+th{background:var(--surface-2);font-size:12.5px;color:var(--muted);font-weight:700;position:sticky;top:0}
+tr:last-child td{border-bottom:0}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+tbody.click tr{cursor:pointer} tbody.click tr:hover{background:var(--surface-2)}
+.pill{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px}
+.pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.ok{background:var(--ok-bg);color:var(--ok)}
+.empty{color:var(--muted);text-align:center;padding:28px 8px;margin:0}
+.btn{font:inherit;font-size:14px;font-weight:600;border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:var(--primary-ink)}
+.btn.danger{color:var(--bad)}
+.btn.sm{font-size:12.5px;padding:4px 9px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.grid-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.msg{font-size:13.5px;margin-top:8px;min-height:1.2em}
+.msg.ok{color:var(--ok)} .msg.bad{color:var(--bad)}
+.file{display:block;width:100%;padding:12px;border:1.5px dashed var(--border);border-radius:10px;background:var(--surface-2);font:inherit;color:var(--text)}
+.scroll-y{max-height:360px;overflow-y:auto}
+.spec-in{width:96px}
+.cols{font-size:12.5px;color:var(--muted);background:var(--surface-2);border-radius:8px;padding:8px 10px;margin:0 0 10px;overflow-x:auto;white-space:nowrap}
+footer{color:var(--muted);font-size:12px;text-align:center;padding:10px 0 28px}
+[hidden]{display:none!important}
+@media (max-width:760px){
+  .filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi .v{font-size:22px}
+  .grid-form{grid-template-columns:repeat(2,minmax(0,1fr))}
+  nav.tabs{width:100%} nav.tabs button{flex:1;padding:8px 6px}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><polyline points="2,15 7,10 11,12 18,4" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="18" cy="4" r="2" fill="#fff"/></svg>
+      </div>
+      <div>
+        <h1>로트워치 <span style="font-weight:500;color:var(--muted);font-size:14px">LotWatch</span></h1>
+        <p>배치(lot)별 품질검사 결과 추세 대시보드</p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="dash" aria-selected="true">대시보드</button>
+      <button role="tab" data-tab="data" aria-selected="false">데이터 입력</button>
+      <button role="tab" data-tab="spec" aria-selected="false">규격 설정</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="banner" id="sampleBanner" hidden>
+    <b>샘플 데이터</b> 표시 중: 실습용 예시 값이며 실제 ㈜포스포 데이터가 아닙니다. 검사 항목과 규격도 가설입니다.
+  </div>
+
+  <!-- 대시보드 -->
+  <section id="tab-dash">
+    <div class="card">
+      <div class="filters">
+        <label class="f">제품<select id="fProduct"></select></label>
+        <label class="f">검사 항목<select id="fItem"></select></label>
+        <label class="f">시작일<input type="date" id="fFrom"></label>
+        <label class="f">종료일<input type="date" id="fTo"></label>
+      </div>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="card">
+      <div class="chart-head">
+        <h2 id="chartTitle">추세 차트</h2>
+        <span class="meta" id="chartMeta"></span>
+      </div>
+      <div id="chart"></div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--point)"></i>정상</span>
+        <span><i class="sw" style="background:var(--warn)"></i>주의 (추세·관리한계)</span>
+        <span><i class="sw" style="background:var(--bad)"></i>규격 이탈</span>
+        <span><i class="ln"></i>규격 상·하한</span>
+        <span><i class="ln mean"></i>평균</span>
+        <span><i class="ln ctl"></i>관리한계 ±3σ</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>이상 배치 경고</h2>
+      <p class="hint">선택한 제품의 전체 검사 항목 기준입니다. 행을 누르면 차트에서 해당 배치를 표시합니다.<br>
+        규칙: 🔴 규격 상·하한 이탈 · 🟠 같은 방향 6배치 연속 상승/하강 · 🟠 평균 ±3σ 밖</p>
+      <div id="alerts"></div>
+    </div>
+  </section>
+
+  <!-- 데이터 입력 -->
+  <section id="tab-data" hidden>
+    <div class="card">
+      <h2>CSV 파일 불러오기</h2>
+      <p class="hint">첫 줄은 열 이름입니다. 엑셀 파일은 <b>다른 이름으로 저장 → CSV</b>로 저장해서 올려 주세요. 첫 버전은 CSV만 읽습니다.</p>
+      <p class="cols">lot_no(배치번호), prod_date(생산일, 2026-10-01 형식), product(제품), 그 밖의 열 = 검사 항목 측정값(숫자)</p>
+      <input type="file" id="csvFile" class="file" accept=".csv,text/csv,.txt">
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="dlTemplate">빈 양식 내려받기</button>
+        <button class="btn" id="dlData">현재 데이터 내려받기</button>
+      </div>
+      <div id="preview"></div>
+    </div>
+
+    <div class="card">
+      <h2>직접 입력</h2>
+      <form id="entryForm" autocomplete="off">
+        <div class="grid-form">
+          <label class="f">배치번호<input type="text" name="lot" required placeholder="예: W-2026-101"></label>
+          <label class="f">생산일<input type="date" name="date" required></label>
+          <label class="f">제품<input type="text" name="product" list="productList" required placeholder="예: White PIG"></label>
+        </div>
+        <div class="grid-form" id="entryItems"></div>
+        <button class="btn primary" type="submit">배치 추가</button>
+        <div class="msg" id="entryMsg"></div>
+      </form>
+      <datalist id="productList"></datalist>
+    </div>
+
+    <div class="card">
+      <div class="chart-head"><h2>저장된 데이터</h2><span class="meta" id="dataCount"></span></div>
+      <div id="dataTable"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="resetSample">샘플 데이터로 되돌리기</button>
+        <button class="btn danger" id="clearAll">모두 지우기</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 규격 설정 -->
+  <section id="tab-spec" hidden>
+    <div class="card">
+      <h2>제품·검사 항목별 규격</h2>
+      <p class="hint">값을 바꾸면 바로 저장되고 대시보드에 반영됩니다. 비워 두면 그 한계는 검사하지 않습니다. 기본값은 <b>샘플 데이터</b>(가설)이며 실제 규격은 기업 확인이 필요합니다.</p>
+      <div id="specTable"></div>
+    </div>
+  </section>
+</main>
+
+<footer>로트워치 시제품 v0.1 · 데이터는 이 브라우저에만 저장되며 서버로 전송되지 않습니다 · 2026 NI2.0 AID 해커톤 8팀 혼돈즈</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  var STORE_KEY = 'lotwatch-v1';
+  var ITEM_LABELS = { cie_x: '색좌표 CIE x', cie_y: '색좌표 CIE y', rel_brightness: '상대 휘도' };
+  var KNOWN_ITEMS = Object.keys(ITEM_LABELS);
+  var HEADER_ALIASES = {
+    'lot_no': 'lot_no', 'lot': 'lot_no', 'lotno': 'lot_no', '배치번호': 'lot_no', '로트번호': 'lot_no', '배치': 'lot_no',
+    'prod_date': 'prod_date', 'date': 'prod_date', '생산일': 'prod_date', '생산일자': 'prod_date', '날짜': 'prod_date',
+    'product': 'product', '제품': 'product', '제품코드': 'product', '제품명': 'product'
+  };
+  var SVGNS = 'http://www.w3.org/2000/svg';
+
+  function $(s) { return document.querySelector(s); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function isNum(v) { return typeof v === 'number' && isFinite(v); }
+  function itemLabel(k) { return ITEM_LABELS[k] || k; }
+  function unitText(u) { return u ? u : '단위 없음'; }
+  function addDays(iso, n) { var d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+
+  /* ---------- 샘플 데이터 (실습용, 실제 기업 데이터 아님) ---------- */
+  function sampleData() {
+    var W = [
+      [0.330, 0.340, 100.3], [0.329, 0.341, 99.7], [0.331, 0.339, 100.9], [0.330, 0.340, 100.1], [0.328, 0.341, 99.4],
+      [0.330, 0.339, 100.6], [0.331, 0.340, 100.2], [0.329, 0.342, 99.8], [0.330, 0.340, 101.0], [0.332, 0.339, 100.4],
+      [0.329, 0.341, 99.9], [0.331, 0.340, 100.8], [0.330, 0.340, 100.6],
+      [0.329, 0.341, 101.2], [0.331, 0.339, 100.4], [0.332, 0.342, 99.8], [0.334, 0.343, 98.9], [0.336, 0.344, 97.6],
+      [0.337, 0.345, 96.8], [0.341, 0.347, 94.5]
+    ];
+    var A = [
+      [0.570, 0.425, 100.2], [0.571, 0.424, 99.6], [0.569, 0.426, 100.8], [0.570, 0.425, 100.1], [0.572, 0.423, 99.2],
+      [0.568, 0.427, 100.5], [0.571, 0.424, 100.0], [0.583, 0.418, 97.1], [0.570, 0.425, 100.4], [0.569, 0.426, 99.8],
+      [0.571, 0.424, 100.3], [0.570, 0.425, 99.9]
+    ];
+    var rows = [], d = '2026-09-01';
+    W.forEach(function (v, i) {
+      if (i) d = addDays(d, i % 2 ? 2 : 3);
+      rows.push({ lot: 'SAMPLE-W-' + String(i + 1).padStart(3, '0'), date: d, product: 'White PIG', values: { cie_x: v[0], cie_y: v[1], rel_brightness: v[2] } });
+    });
+    d = '2026-09-02';
+    A.forEach(function (v, i) {
+      if (i) d = addDays(d, 4);
+      rows.push({ lot: 'SAMPLE-A-' + String(i + 1).padStart(3, '0'), date: d, product: 'Amber PIG', values: { cie_x: v[0], cie_y: v[1], rel_brightness: v[2] } });
+    });
+    var specs = [
+      { product: 'White PIG', item: 'cie_x', unit: '', lsl: 0.320, target: 0.330, usl: 0.340 },
+      { product: 'White PIG', item: 'cie_y', unit: '', lsl: 0.330, target: 0.340, usl: 0.350 },
+      { product: 'White PIG', item: 'rel_brightness', unit: '%', lsl: 95, target: 100, usl: null },
+      { product: 'Amber PIG', item: 'cie_x', unit: '', lsl: 0.560, target: 0.570, usl: 0.580 },
+      { product: 'Amber PIG', item: 'cie_y', unit: '', lsl: 0.415, target: 0.425, usl: 0.435 },
+      { product: 'Amber PIG', item: 'rel_brightness', unit: '%', lsl: 95, target: 100, usl: null }
+    ];
+    return { rows: rows, specs: specs };
+  }
+
+  /* ---------- 저장 ---------- */
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (raw) {
+        var s = JSON.parse(raw);
+        if (s && Array.isArray(s.rows) && Array.isArray(s.specs)) return s;
+      }
+    } catch (e) { /* 저장소를 쓸 수 없으면 샘플로 시작 */ }
+    return sampleData();
+  }
+  function save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* 무시 */ }
+  }
+
+  var state = load();
+  var ui = { tab: 'dash', product: '', item: '', from: '', to: '', highlight: null, pending: null };
+
+  /* ---------- 데이터 조회 ---------- */
+  function sortItems(list) {
+    return list.sort(function (a, b) {
+      var ia = KNOWN_ITEMS.indexOf(a), ib = KNOWN_ITEMS.indexOf(b);
+      if (ia < 0) ia = 99; if (ib < 0) ib = 99;
+      return ia - ib || a.localeCompare(b);
+    });
+  }
+  function products() {
+    var set = {};
+    state.rows.forEach(function (r) { set[r.product] = 1; });
+    state.specs.forEach(function (s) { set[s.product] = 1; });
+    return Object.keys(set).sort();
+  }
+  function itemsFor(p) {
+    var set = {};
+    state.rows.forEach(function (r) { if (r.product === p) Object.keys(r.values).forEach(function (k) { set[k] = 1; }); });
+    state.specs.forEach(function (s) { if (s.product === p) set[s.item] = 1; });
+    return sortItems(Object.keys(set));
+  }
+  function allItems() {
+    var set = {};
+    state.rows.forEach(function (r) { Object.keys(r.values).forEach(function (k) { set[k] = 1; }); });
+    state.specs.forEach(function (s) { set[s.item] = 1; });
+    var list = sortItems(Object.keys(set));
+    return list.length ? list : KNOWN_ITEMS.slice();
+  }
+  function getSpec(p, item) {
+    for (var i = 0; i < state.specs.length; i++) if (state.specs[i].product === p && state.specs[i].item === item) return state.specs[i];
+    return null;
+  }
+  function ensureSpecs() {
+    state.rows.forEach(function (r) {
+      Object.keys(r.values).forEach(function (k) {
+        if (!getSpec(r.product, k)) state.specs.push({ product: r.product, item: k, unit: '', lsl: null, target: null, usl: null });
+      });
+    });
+  }
+  function byDateLot(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : a.lot.localeCompare(b.lot); }
+  function inPeriod(date) { return (!ui.from || date >= ui.from) && (!ui.to || date <= ui.to); }
+  function rowsFor(p) { return state.rows.filter(function (r) { return r.product === p && inPeriod(r.date); }).sort(byDateLot); }
+
+  /* ---------- 경고 규칙 ---------- */
+  function evaluate(points, spec) {
+    var n = points.length, sum = 0;
+    points.forEach(function (p) { sum += p.v; });
+    var mean = n ? sum / n : null, sd = null;
+    if (n >= 2) {
+      var ss = 0;
+      points.forEach(function (p) { ss += (p.v - mean) * (p.v - mean); });
+      sd = Math.sqrt(ss / (n - 1));
+    }
+    var run = 1, dir = 0;
+    points.forEach(function (p, i) {
+      var rules = [];
+      if (spec) {
+        if (isNum(spec.usl) && p.v > spec.usl) rules.push({ k: 'spec', t: '규격 상한 초과' });
+        if (isNum(spec.lsl) && p.v < spec.lsl) rules.push({ k: 'spec', t: '규격 하한 미만' });
+      }
+      if (i > 0) {
+        var d = Math.sign(p.v - points[i - 1].v);
+        if (d !== 0 && d === dir) run++; else run = d !== 0 ? 2 : 1;
+        dir = d;
+      }
+      if (run >= 6) rules.push({ k: 'trend', t: run + '배치 연속 ' + (dir > 0 ? '상승' : '하강') });
+      if (sd && sd > 0 && Math.abs(p.v - mean) > 3 * sd) rules.push({ k: 'sigma', t: '관리한계(평균±3σ) 밖' });
+      p.rules = rules;
+      p.level = rules.some(function (r) { return r.k === 'spec'; }) ? 'bad' : rules.length ? 'warn' : 'ok';
+    });
+    return { points: points, mean: mean, sd: sd };
+  }
+  function analyze(p) {
+    var rows = rowsFor(p), out = {};
+    itemsFor(p).forEach(function (item) {
+      var pts = [];
+      rows.forEach(function (r) { var v = r.values[item]; if (isNum(v)) pts.push({ lot: r.lot, date: r.date, v: v }); });
+      out[item] = evaluate(pts, getSpec(p, item));
+    });
+    return { rows: rows, items: out };
+  }
+
+  /* ---------- 대시보드 ---------- */
+  function fillSelect(sel, list, value, labelFn) {
+    sel.innerHTML = list.map(function (v) {
+      return '<option value="' + esc(v) + '"' + (v === value ? ' selected' : '') + '>' + esc(labelFn ? labelFn(v) : v) + '</option>';
+    }).join('');
+  }
+
+  function renderDashboard() {
+    var plist = products();
+    if (plist.indexOf(ui.product) < 0) {
+      var latestRow = state.rows.slice().sort(byDateLot).pop();
+      ui.product = latestRow ? latestRow.product : (plist[0] || '');
+    }
+    var ilist = ui.product ? itemsFor(ui.product) : [];
+    if (ilist.indexOf(ui.item) < 0) ui.item = ilist[0] || '';
+    fillSelect($('#fProduct'), plist, ui.product);
+    fillSelect($('#fItem'), ilist, ui.item, itemLabel);
+
+    if (!state.rows.length) {
+      $('#kpis').innerHTML = '';
+      $('#chartTitle').textContent = '추세 차트';
+      $('#chartMeta').textContent = '';
+      $('#chart').innerHTML = '<p class="empty">데이터가 없습니다. <b>데이터 입력</b> 탭에서 CSV를 올리거나 직접 입력해 주세요.</p>';
+      $('#alerts').innerHTML = '<p class="empty">표시할 경고가 없습니다.</p>';
+      return;
+    }
+
+    var an = analyze(ui.product);
+    var badLots = {}, warnLots = {}, alerts = [], lotLevel = {};
+    Object.keys(an.items).forEach(function (item) {
+      var spec = getSpec(ui.product, item);
+      an.items[item].points.forEach(function (p) {
+        if (p.level === 'ok') return;
+        if (p.level === 'bad') badLots[p.lot] = 1;
+        if (p.rules.some(function (r) { return r.k !== 'spec'; })) warnLots[p.lot] = 1;
+        if (lotLevel[p.lot] !== 'bad') lotLevel[p.lot] = p.level;
+        alerts.push({ lot: p.lot, date: p.date, item: item, v: p.v, unit: spec ? spec.unit : '', level: p.level, rules: p.rules });
+      });
+    });
+    alerts.sort(function (a, b) { return b.date.localeCompare(a.date) || (a.level === 'bad' ? -1 : 1) - (b.level === 'bad' ? -1 : 1) || a.lot.localeCompare(b.lot); });
+
+    var latest = an.rows[an.rows.length - 1];
+    var latestLevel = latest ? (lotLevel[latest.lot] || 'ok') : null;
+    var verdict = { ok: ['정상', 'ok'], warn: ['주의', 'warn'], bad: ['규격 이탈', 'bad'] };
+    var nBad = Object.keys(badLots).length, nWarn = Object.keys(warnLots).length;
+    $('#kpis').innerHTML =
+      kpi('조회 배치 수', an.rows.length, an.rows.length ? esc(an.rows[0].date) + ' ~ ' + esc(latest.date) : '기간 내 데이터 없음', '') +
+      kpi('규격 이탈 배치', nBad, '상·하한을 벗어난 배치', nBad ? 'bad' : 'ok') +
+      kpi('주의 배치', nWarn, '연속 추세·±3σ 경고', nWarn ? 'warn' : 'ok') +
+      (latest ? kpi('최근 배치 판정', verdict[latestLevel][0], esc(latest.lot), verdict[latestLevel][1]) : kpi('최근 배치 판정', '-', '', ''));
+
+    var spec = getSpec(ui.product, ui.item);
+    var ev = an.items[ui.item] || { points: [], mean: null, sd: null };
+    $('#chartTitle').textContent = ui.product + ' · ' + itemLabel(ui.item);
+    var metaParts = ['단위: ' + unitText(spec && spec.unit)];
+    if (spec && (isNum(spec.lsl) || isNum(spec.usl))) metaParts.push('규격 ' + (isNum(spec.lsl) ? spec.lsl : '–') + ' ~ ' + (isNum(spec.usl) ? spec.usl : '–'));
+    else metaParts.push('규격 미설정');
+    $('#chartMeta').textContent = metaParts.join(' · ');
+    renderChart(ev, spec);
+
+    if (!alerts.length) {
+      $('#alerts').innerHTML = '<p class="empty">이상 배치가 없습니다 ✅</p>';
+    } else {
+      $('#alerts').innerHTML = '<div class="tbl-wrap scroll-y"><table><thead><tr><th>판정</th><th>배치번호</th><th>생산일</th><th>검사 항목</th><th>값</th><th>위반 규칙</th></tr></thead><tbody class="click">' +
+        alerts.map(function (a) {
+          return '<tr data-item="' + esc(a.item) + '" data-lot="' + esc(a.lot) + '"><td><span class="pill ' + a.level + '">' + (a.level === 'bad' ? '🔴 이탈' : '🟠 주의') + '</span></td>' +
+            '<td>' + esc(a.lot) + '</td><td>' + esc(a.date) + '</td><td>' + esc(itemLabel(a.item)) + '</td>' +
+            '<td class="num">' + esc(a.v) + (a.unit ? ' ' + esc(a.unit) : '') + '</td>' +
+            '<td>' + a.rules.map(function (r) { return esc(r.t); }).join(', ') + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }
+  }
+  function kpi(k, v, s, cls) {
+    return '<div class="kpi ' + cls + '"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + '</div><div class="s">' + s + '</div></div>';
+  }
+
+  /* ---------- 차트 (SVG) ---------- */
+  function niceNum(r) {
+    var exp = Math.floor(Math.log10(r)), f = r / Math.pow(10, exp);
+    var nf = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+    return nf * Math.pow(10, exp);
+  }
+  function niceTicks(lo, hi, count) {
+    var step = niceNum((hi - lo) / count);
+    var dec = Math.max(0, -Math.floor(Math.log10(step)));
+    var start = Math.floor(lo / step) * step, end = Math.ceil(hi / step) * step, t = [];
+    for (var v = start; v <= end + step / 2; v += step) t.push(+v.toFixed(dec + 2));
+    return { ticks: t, dec: dec };
+  }
+  function el(tag, attrs, text) {
+    var e = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function renderChart(ev, spec) {
+    var box = $('#chart');
+    box.innerHTML = '';
+    var pts = ev.points;
+    if (!pts.length) { box.innerHTML = '<p class="empty">선택한 조건에 맞는 측정값이 없습니다.</p>'; return; }
+
+    var W = Math.max(280, box.clientWidth || 600), H = W < 560 ? 270 : 340;
+    var pl = 50, pr = 62, pt = 14, pb = 46, iw = W - pl - pr - 10, ih = H - pt - pb;
+    var vals = pts.map(function (p) { return p.v; });
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    [spec && spec.lsl, spec && spec.usl, ev.mean].forEach(function (v) { if (isNum(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } });
+    if (hi === lo) { var d0 = Math.abs(hi) * 0.01 || 1; hi += d0; lo -= d0; }
+    var pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+    var nt = niceTicks(lo, hi, 5);
+    lo = nt.ticks[0]; hi = nt.ticks[nt.ticks.length - 1];
+
+    function x(i) { return pl + (pts.length === 1 ? iw / 2 : i * iw / (pts.length - 1)); }
+    function y(v) { return pt + ih - (v - lo) / (hi - lo) * ih; }
+
+    var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H, role: 'img', 'aria-label': '배치별 측정값 추세 차트' });
+
+    nt.ticks.forEach(function (t) {
+      svg.appendChild(el('line', { x1: pl, x2: W - pr, y1: y(t), y2: y(t), stroke: 'var(--grid)', 'stroke-width': 1 }));
+      svg.appendChild(el('text', { x: pl - 6, y: y(t) + 4, 'text-anchor': 'end' }, t.toFixed(nt.dec)));
+    });
+
+    var labels = [];
+    function hline(v, stroke, dash, w, label) {
+      if (!isNum(v) || v < lo || v > hi) return;
+      svg.appendChild(el('line', { x1: pl, x2: W - pr, y1: y(v), y2: y(v), stroke: stroke, 'stroke-width': w, 'stroke-dasharray': dash }));
+      if (label) labels.push({ y: y(v), stroke: stroke, text: label });
+    }
+    function drawLabels() {
+      labels.sort(function (a, b) { return a.y - b.y; });
+      for (var i = 1; i < labels.length; i++) if (labels[i].y - labels[i - 1].y < 13) labels[i].y = labels[i - 1].y + 13;
+      labels.forEach(function (l) {
+        svg.appendChild(el('text', { x: W - pr + 4, y: l.y + 4, 'text-anchor': 'start', style: 'fill:' + l.stroke + ';font-weight:600;font-size:10.5px' }, l.text));
+      });
+    }
+    if (ev.sd) {
+      hline(ev.mean + 3 * ev.sd, 'var(--ctl)', '2 3', 1.5, '+3σ');
+      hline(ev.mean - 3 * ev.sd, 'var(--ctl)', '2 3', 1.5, '−3σ');
+    }
+    hline(ev.mean, 'var(--mean)', '', 1.5, '평균');
+    if (spec) {
+      hline(spec.usl, 'var(--spec)', '6 4', 2, '상한 ' + spec.usl);
+      hline(spec.lsl, 'var(--spec)', '6 4', 2, '하한 ' + spec.lsl);
+    }
+    drawLabels();
+
+    var path = pts.map(function (p, i) { return (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1); }).join(' ');
+    svg.appendChild(el('path', { d: path, fill: 'none', stroke: 'var(--point)', 'stroke-width': 2, 'stroke-linejoin': 'round', opacity: 0.85 }));
+
+    var every = Math.max(1, Math.ceil(pts.length / Math.max(1, Math.floor(iw / 52))));
+    pts.forEach(function (p, i) {
+      if (i % every === 0 || i === pts.length - 1) {
+        if (i === pts.length - 1 && i % every !== 0 && (i % every) < every / 2) return;
+        svg.appendChild(el('text', { x: x(i), y: H - pb + 16, 'text-anchor': 'middle' }, p.lot.split('-').pop()));
+        svg.appendChild(el('text', { x: x(i), y: H - pb + 30, 'text-anchor': 'middle', style: 'font-size:10px' }, p.date.slice(5)));
+      }
+    });
+
+    pts.forEach(function (p, i) {
+      var color = p.level === 'bad' ? 'var(--bad)' : p.level === 'warn' ? 'var(--warn)' : 'var(--point)';
+      if (ui.highlight === p.lot) svg.appendChild(el('circle', { cx: x(i), cy: y(p.v), r: 11, fill: 'none', stroke: 'var(--text)', 'stroke-width': 2 }));
+      svg.appendChild(el('circle', { cx: x(i), cy: y(p.v), r: p.level === 'ok' ? 4 : 6, fill: color, stroke: 'var(--surface)', 'stroke-width': 1.5 }));
+      svg.appendChild(el('circle', { cx: x(i), cy: y(p.v), r: 13, fill: 'transparent', 'data-i': i, class: 'hit', style: 'cursor:pointer' }));
+    });
+
+    box.appendChild(svg);
+    var tip = document.createElement('div');
+    tip.className = 'tip';
+    box.appendChild(tip);
+
+    function show(i) {
+      var p = pts[i], u = spec && spec.unit ? ' ' + spec.unit : '';
+      var status = p.level === 'bad' ? '🔴 규격 이탈' : p.level === 'warn' ? '🟠 주의' : '정상';
+      tip.innerHTML = '<b>' + esc(p.lot) + '</b><br>' + esc(p.date) + '<br>' + esc(itemLabel(ui.item)) + ': <b>' + esc(p.v) + esc(u) + '</b><br>' + status +
+        (p.rules.length ? '<br>' + p.rules.map(function (r) { return '· ' + esc(r.t); }).join('<br>') : '');
+      tip.style.display = 'block';
+      var tw = tip.offsetWidth, th = tip.offsetHeight;
+      var left = x(i) + 12, top = y(p.v) - th - 10;
+      if (left + tw > W) left = x(i) - tw - 12;
+      if (left < 0) left = 0;
+      if (top < 0) top = y(p.v) + 14;
+      tip.style.left = left + 'px'; tip.style.top = top + 'px';
+    }
+    svg.addEventListener('pointerover', function (e) { if (e.target.classList.contains('hit')) show(+e.target.getAttribute('data-i')); });
+    svg.addEventListener('click', function (e) { if (e.target.classList.contains('hit')) show(+e.target.getAttribute('data-i')); else tip.style.display = 'none'; });
+    svg.addEventListener('pointerleave', function (e) { if (e.pointerType === 'mouse') tip.style.display = 'none'; });
+  }
+
+  /* ---------- CSV ---------- */
+  function parseCSV(text) {
+    text = text.replace(/^﻿/, '');
+    var first = text.split(/\r?\n/)[0] || '';
+    var delim = first.indexOf(',') < 0 && first.indexOf('\t') >= 0 ? '\t' : ',';
+    var rows = [], row = [], cell = '', q = false;
+    for (var i = 0; i < text.length; i++) {
+      var c = text[i];
+      if (q) {
+        if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+        else cell += c;
+      } else if (c === '"') q = true;
+      else if (c === delim) { row.push(cell); cell = ''; }
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && text[i + 1] === '\n') i++;
+        row.push(cell); rows.push(row); row = []; cell = '';
+      } else cell += c;
+    }
+    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+    return rows.filter(function (r) { return r.some(function (c) { return c.trim() !== ''; }); });
+  }
+  function normDate(s) {
+    var m = /^(\d{4})[-./](\d{1,2})[-./](\d{1,2})\.?$/.exec(String(s).trim());
+    if (!m) return null;
+    var iso = m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0');
+    var d = new Date(iso + 'T00:00:00Z');
+    return !isNaN(d) && d.toISOString().slice(0, 10) === iso ? iso : null;
+  }
+  function csvCell(v) { v = v == null ? '' : String(v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  function download(name, text) {
+    var blob = new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+  function decodeFile(buf) {
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+    catch (e) { return new TextDecoder('euc-kr').decode(buf); } // 한글 엑셀 기본 CSV(CP949)
+  }
+
+  function buildPreview(text, fileName) {
+    var table = parseCSV(text);
+    if (table.length < 2) return { error: '데이터 행이 없습니다. 첫 줄은 열 이름, 둘째 줄부터 데이터여야 합니다.' };
+    var header = table[0].map(function (h) { var k = h.trim(); return HEADER_ALIASES[k.toLowerCase()] || HEADER_ALIASES[k] || k; });
+    var missing = ['lot_no', 'prod_date', 'product'].filter(function (c) { return header.indexOf(c) < 0; });
+    if (missing.length) return { error: '필수 열이 없습니다: ' + missing.join(', ') + ' (배치번호·생산일·제품)' };
+    var itemCols = header.filter(function (h) { return h && ['lot_no', 'prod_date', 'product'].indexOf(h) < 0; });
+    if (!itemCols.length) return { error: '검사 항목(측정값) 열이 없습니다.' };
+    var existing = {};
+    state.rows.forEach(function (r) { existing[r.lot] = 1; });
+    var seen = {}, out = [];
+    table.slice(1).forEach(function (cells, idx) {
+      var get = function (c) { var i = header.indexOf(c); return i < 0 || cells[i] == null ? '' : cells[i].trim(); };
+      var errs = [], warns = [], values = {};
+      var lot = get('lot_no'), dateRaw = get('prod_date'), product = get('product');
+      if (!lot) errs.push('배치번호 빈칸');
+      var date = normDate(dateRaw);
+      if (!dateRaw) errs.push('생산일 빈칸'); else if (!date) errs.push('생산일 형식 오류(' + dateRaw + ')');
+      if (!product) errs.push('제품 빈칸');
+      var blanks = 0;
+      itemCols.forEach(function (c) {
+        var s = get(c);
+        if (s === '') { blanks++; return; }
+        var n = Number(s.replace(/\s/g, ''));
+        if (!isFinite(n)) errs.push(itemLabel(c) + ' 숫자 아님(' + s + ')'); else values[c] = n;
+      });
+      if (blanks) warns.push('측정값 빈칸 ' + blanks + '개');
+      if (blanks === itemCols.length) errs.push('측정값 없음');
+      var dupFile = false, dupExisting = false;
+      if (lot) {
+        if (seen[lot]) { dupFile = true; errs.push('파일 안 중복 배치번호'); }
+        seen[lot] = 1;
+        if (existing[lot]) dupExisting = true;
+      }
+      out.push({ line: idx + 2, lot: lot, date: date || dateRaw, product: product, values: values, errs: errs, warns: warns, dupExisting: dupExisting });
+    });
+    return { fileName: fileName, itemCols: itemCols, rows: out };
+  }
+
+  function renderPreview() {
+    var pv = ui.pending, box = $('#preview');
+    if (!pv) { box.innerHTML = ''; return; }
+    if (pv.error) { box.innerHTML = '<div class="msg bad">⚠️ ' + esc(pv.error) + '</div>'; return; }
+    var okRows = pv.rows.filter(function (r) { return !r.errs.length; });
+    var appendable = okRows.filter(function (r) { return !r.dupExisting; }).length;
+    var errCount = pv.rows.length - okRows.length;
+    var dupCount = okRows.length - appendable;
+    var shown = pv.rows.slice(0, 100);
+    box.innerHTML =
+      '<h2 style="margin-top:16px">미리보기: ' + esc(pv.fileName) + '</h2>' +
+      '<p class="hint">전체 ' + pv.rows.length + '행 · 정상 ' + okRows.length + '행 · <span style="color:var(--bad)">오류 ' + errCount + '행</span>' +
+      (dupCount ? ' · 기존 데이터와 같은 배치번호 ' + dupCount + '행(추가 시 제외)' : '') + ' · 검사 항목: ' + pv.itemCols.map(function (c) { return esc(itemLabel(c)); }).join(', ') + '</p>' +
+      '<div class="tbl-wrap scroll-y"><table><thead><tr><th>줄</th><th>상태</th><th>배치번호</th><th>생산일</th><th>제품</th>' +
+      pv.itemCols.map(function (c) { return '<th>' + esc(itemLabel(c)) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      shown.map(function (r) {
+        var st = r.errs.length ? '<span class="pill bad">오류</span> ' + esc(r.errs.join(', '))
+          : r.dupExisting ? '<span class="pill warn">중복</span> 기존 배치번호'
+          : r.warns.length ? '<span class="pill warn">확인</span> ' + esc(r.warns.join(', ')) : '<span class="pill ok">정상</span>';
+        return '<tr><td class="num">' + r.line + '</td><td>' + st + '</td><td>' + esc(r.lot) + '</td><td>' + esc(r.date) + '</td><td>' + esc(r.product) + '</td>' +
+          pv.itemCols.map(function (c) { return '<td class="num">' + (c in r.values ? esc(r.values[c]) : '') + '</td>'; }).join('') + '</tr>';
+      }).join('') + '</tbody></table></div>' +
+      (pv.rows.length > shown.length ? '<p class="hint">앞 100행만 표시했습니다.</p>' : '') +
+      '<div class="row" style="margin-top:10px">' +
+      '<button class="btn primary" id="impAppend"' + (appendable ? '' : ' disabled') + '>정상 행 ' + appendable + '개 추가</button>' +
+      '<button class="btn" id="impReplace"' + (okRows.length ? '' : ' disabled') + '>기존 데이터를 지우고 ' + okRows.length + '개로 바꾸기</button>' +
+      '<button class="btn" id="impCancel">취소</button></div><div class="msg" id="impMsg"></div>';
+  }
+
+  function doImport(replace) {
+    var pv = ui.pending;
+    var rows = pv.rows.filter(function (r) { return !r.errs.length && (replace || !r.dupExisting); })
+      .map(function (r) { return { lot: r.lot, date: r.date, product: r.product, values: r.values }; });
+    if (replace) {
+      if (!confirm('지금 저장된 데이터 ' + state.rows.length + '건을 지우고 ' + rows.length + '건으로 바꿀까요?')) return;
+      state.rows = rows;
+      var used = {};
+      rows.forEach(function (r) { used[r.product] = 1; });
+      state.specs = state.specs.filter(function (s) { return used[s.product]; });
+    } else {
+      state.rows = state.rows.concat(rows);
+    }
+    ensureSpecs(); save();
+    ui.pending = null; $('#csvFile').value = '';
+    ui.product = rows.length ? rows[0].product : ui.product;
+    renderAll();
+    $('#preview').innerHTML = '<div class="msg ok">✅ ' + rows.length + '개 배치를 ' + (replace ? '불러왔습니다' : '추가했습니다') + '. 규격이 비어 있는 항목은 <b>규격 설정</b> 탭에서 입력해 주세요.</div>';
+  }
+
+  /* ---------- 데이터 입력 탭 ---------- */
+  function renderDataTab() {
+    var items = allItems();
+    var form = $('#entryItems');
+    var prev = {};
+    form.querySelectorAll('input').forEach(function (i) { prev[i.name] = i.value; });
+    form.innerHTML = items.map(function (it) {
+      var sp = state.specs.filter(function (s) { return s.item === it && s.unit; })[0];
+      return '<label class="f">' + esc(itemLabel(it)) + (sp ? ' (' + esc(sp.unit) + ')' : '') +
+        '<input type="number" step="any" inputmode="decimal" name="v_' + esc(it) + '" value="' + esc(prev['v_' + it] || '') + '"></label>';
+    }).join('');
+    $('#productList').innerHTML = products().map(function (p) { return '<option value="' + esc(p) + '">'; }).join('');
+
+    var rows = state.rows.slice().sort(byDateLot).reverse();
+    $('#dataCount').textContent = '총 ' + rows.length + '건';
+    if (!rows.length) { $('#dataTable').innerHTML = '<p class="empty">저장된 데이터가 없습니다.</p>'; return; }
+    $('#dataTable').innerHTML = '<div class="tbl-wrap scroll-y"><table><thead><tr><th>배치번호</th><th>생산일</th><th>제품</th>' +
+      items.map(function (it) { return '<th>' + esc(itemLabel(it)) + '</th>'; }).join('') + '<th></th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr><td>' + esc(r.lot) + '</td><td>' + esc(r.date) + '</td><td>' + esc(r.product) + '</td>' +
+          items.map(function (it) { return '<td class="num">' + (isNum(r.values[it]) ? esc(r.values[it]) : '') + '</td>'; }).join('') +
+          '<td><button class="btn sm danger" data-del="' + esc(r.lot) + '">삭제</button></td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  /* ---------- 규격 설정 탭 ---------- */
+  function renderSpecTab() {
+    ensureSpecs();
+    var order = allItems();
+    var specs = state.specs.slice().sort(function (a, b) {
+      return a.product.localeCompare(b.product) || order.indexOf(a.item) - order.indexOf(b.item);
+    });
+    if (!specs.length) { $('#specTable').innerHTML = '<p class="empty">데이터를 먼저 입력하면 제품·항목별 규격 행이 생깁니다.</p>'; return; }
+    $('#specTable').innerHTML = '<div class="tbl-wrap"><table><thead><tr><th>제품</th><th>검사 항목</th><th>단위</th><th>하한</th><th>목표</th><th>상한</th><th></th></tr></thead><tbody>' +
+      specs.map(function (s) {
+        var idx = state.specs.indexOf(s);
+        var f = function (k) { return '<input class="spec-in" type="number" step="any" inputmode="decimal" data-idx="' + idx + '" data-k="' + k + '" value="' + (isNum(s[k]) ? s[k] : '') + '">'; };
+        return '<tr><td>' + esc(s.product) + '</td><td>' + esc(itemLabel(s.item)) + '</td>' +
+          '<td><input class="spec-in" type="text" data-idx="' + idx + '" data-k="unit" value="' + esc(s.unit) + '" placeholder="예: %"></td>' +
+          '<td>' + f('lsl') + '</td><td>' + f('target') + '</td><td>' + f('usl') + '</td><td class="spec-warn" data-row="' + idx + '"></td></tr>';
+      }).join('') + '</tbody></table></div>';
+    specs.forEach(function (s) { checkSpec(state.specs.indexOf(s)); });
+  }
+  function checkSpec(idx) {
+    var s = state.specs[idx], cell = document.querySelector('.spec-warn[data-row="' + idx + '"]');
+    if (!cell) return;
+    cell.innerHTML = isNum(s.lsl) && isNum(s.usl) && s.lsl >= s.usl ? '<span class="pill bad">하한 ≥ 상한</span>' : '';
+  }
+
+  function renderAll() {
+    $('#sampleBanner').hidden = !state.rows.some(function (r) { return /^SAMPLE-/.test(r.lot); });
+    renderDashboard();
+    renderDataTab();
+    renderSpecTab();
+  }
+
+  /* ---------- 이벤트 ---------- */
+  document.querySelectorAll('nav.tabs button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      ui.tab = b.getAttribute('data-tab');
+      document.querySelectorAll('nav.tabs button').forEach(function (x) { x.setAttribute('aria-selected', x === b ? 'true' : 'false'); });
+      ['dash', 'data', 'spec'].forEach(function (t) { $('#tab-' + t).hidden = t !== ui.tab; });
+      if (ui.tab === 'dash') renderDashboard();
+      window.scrollTo(0, 0);
+    });
+  });
+
+  $('#fProduct').addEventListener('change', function (e) { ui.product = e.target.value; ui.item = ''; ui.highlight = null; renderDashboard(); });
+  $('#fItem').addEventListener('change', function (e) { ui.item = e.target.value; ui.highlight = null; renderDashboard(); });
+  $('#fFrom').addEventListener('change', function (e) { ui.from = e.target.value; renderDashboard(); });
+  $('#fTo').addEventListener('change', function (e) { ui.to = e.target.value; renderDashboard(); });
+
+  $('#alerts').addEventListener('click', function (e) {
+    var tr = e.target.closest('tr[data-lot]');
+    if (!tr) return;
+    ui.item = tr.getAttribute('data-item');
+    ui.highlight = tr.getAttribute('data-lot');
+    renderDashboard();
+    $('#chart').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  var resizeTimer;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () { if (ui.tab === 'dash') renderDashboard(); }, 150);
+  });
+
+  $('#csvFile').addEventListener('change', function (e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () { ui.pending = buildPreview(decodeFile(reader.result), file.name); renderPreview(); };
+    reader.onerror = function () { ui.pending = { error: '파일을 읽지 못했습니다.' }; renderPreview(); };
+    reader.readAsArrayBuffer(file);
+  });
+  $('#preview').addEventListener('click', function (e) {
+    if (e.target.id === 'impAppend') doImport(false);
+    else if (e.target.id === 'impReplace') doImport(true);
+    else if (e.target.id === 'impCancel') { ui.pending = null; $('#csvFile').value = ''; renderPreview(); }
+  });
+
+  $('#dlTemplate').addEventListener('click', function () {
+    download('lotwatch-양식.csv', ['lot_no', 'prod_date', 'product'].concat(allItems()).join(',') + '\r\n');
+  });
+  $('#dlData').addEventListener('click', function () {
+    var items = allItems();
+    var lines = [['lot_no', 'prod_date', 'product'].concat(items).join(',')];
+    state.rows.slice().sort(byDateLot).forEach(function (r) {
+      lines.push([r.lot, r.date, r.product].concat(items.map(function (it) { return isNum(r.values[it]) ? r.values[it] : ''; })).map(csvCell).join(','));
+    });
+    var isSample = state.rows.some(function (r) { return /^SAMPLE-/.test(r.lot); });
+    download(isSample ? 'sample-lots.csv' : 'lotwatch-data.csv', lines.join('\r\n') + '\r\n');
+  });
+
+  $('#entryForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var f = e.target, msg = $('#entryMsg');
+    var lot = f.lot.value.trim(), date = normDate(f.date.value), product = f.product.value.trim();
+    var values = {};
+    f.querySelectorAll('#entryItems input').forEach(function (i) {
+      if (i.value.trim() !== '' && isFinite(Number(i.value))) values[i.name.slice(2)] = Number(i.value);
+    });
+    var err = !lot ? '배치번호를 입력해 주세요.' : !date ? '생산일을 입력해 주세요.' : !product ? '제품을 입력해 주세요.'
+      : state.rows.some(function (r) { return r.lot === lot; }) ? '이미 있는 배치번호입니다: ' + lot
+      : !Object.keys(values).length ? '측정값을 하나 이상 입력해 주세요.' : '';
+    if (err) { msg.className = 'msg bad'; msg.textContent = err; return; }
+    state.rows.push({ lot: lot, date: date, product: product, values: values });
+    ensureSpecs(); save();
+    f.lot.value = '';
+    f.querySelectorAll('#entryItems input').forEach(function (i) { i.value = ''; });
+    ui.product = product;
+    renderAll();
+    var an = analyze(product), lv = 'ok';
+    Object.keys(an.items).forEach(function (it) { an.items[it].points.forEach(function (p) { if (p.lot === lot && p.level !== 'ok' && lv !== 'bad') lv = p.level; }); });
+    msg.className = 'msg ' + (lv === 'bad' ? 'bad' : 'ok');
+    msg.textContent = '✅ ' + lot + ' 추가됨 · 판정: ' + (lv === 'bad' ? '🔴 규격 이탈' : lv === 'warn' ? '🟠 주의' : '정상') + ' (대시보드에서 확인)';
+  });
+
+  $('#dataTable').addEventListener('click', function (e) {
+    var lot = e.target.getAttribute && e.target.getAttribute('data-del');
+    if (!lot) return;
+    if (!confirm(lot + ' 배치를 삭제할까요?')) return;
+    state.rows = state.rows.filter(function (r) { return r.lot !== lot; });
+    save(); renderAll();
+  });
+  $('#resetSample').addEventListener('click', function () {
+    if (!confirm('샘플 데이터로 되돌릴까요? 지금 데이터와 규격은 지워집니다.')) return;
+    state = sampleData(); save(); ui.product = ''; ui.item = ''; renderAll();
+  });
+  $('#clearAll').addEventListener('click', function () {
+    if (!confirm('모든 데이터와 규격을 지울까요? 되돌릴 수 없습니다.')) return;
+    state = { rows: [], specs: [] }; save(); renderAll();
+  });
+
+  $('#specTable').addEventListener('change', function (e) {
+    var t = e.target, idx = t.getAttribute('data-idx'), k = t.getAttribute('data-k');
+    if (idx == null) return;
+    var s = state.specs[+idx];
+    if (k === 'unit') s.unit = t.value.trim();
+    else s[k] = t.value.trim() === '' || !isFinite(Number(t.value)) ? null : Number(t.value);
+    save(); checkSpec(+idx);
+    $('#sampleBanner').hidden = !state.rows.some(function (r) { return /^SAMPLE-/.test(r.lot); });
+  });
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
